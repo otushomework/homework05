@@ -1,0 +1,29 @@
+language: cpp
+sudo: required
+before_install:
+  - sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test
+  - sudo apt-get update -qq
+install:
+  - sudo apt-get install g++-6 cmake libboost-test-dev libboost-program-options-dev doxygen graphviz -y
+  - sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-6 90
+before_script:
+  - ls
+  - gcc --version
+  - g++ --version
+  - cmake --version
+script:
+  - cmake .
+  - cmake --build .
+  - cmake --build . --target package
+  - doxygen
+deploy:
+  - provider: pages
+    skip-cleanup: true
+    github-token: $GITHUB_TOKEN  # Set in the settings page of your repository, as a secure variable
+    keep-history: true
+    on:
+      branch: master
+  - provider: script
+    skip_cleanup: true
+    script:
+      - curl -T print_ip-0.0.$TRAVIS_BUILD_NUMBER-Linux.deb -ukafeg:$BINTRAY_API_KEY "https://api.bintray.com/content/kafeg/otus/homeworks/$TRAVIS_BUILD_NUMBER/print_ip-0.0.$TRAVIS_BUILD_NUMBER-Linux.deb;deb_distribution=trusty;deb_component=main;deb_architecture=amd64;publish=1"
