@@ -1,6 +1,7 @@
 #include <iostream>
 #include <vector>
 #include <map>
+#include <assert.h>
 
 //#define ENABLE_2D_MATRIX
 //#define ENABLE_3D_MATRIX
