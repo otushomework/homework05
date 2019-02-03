@@ -18,60 +18,64 @@ public:
     auto begin() { return m_data.begin(); }
     auto end()   { return m_data.end();   }
 
-    template<class ContainerType>
+    //рекурсивный Proxy класс
+    template<class ContainerType, size_t SubDimension>
     struct Proxy
     {
-        ContainerType *container;
-        std::vector<int> index;
+    private:
+        ContainerType *m_container;
+        std::vector<int> m_index;
+    public:
 
-        void fillIndex()
+        Proxy(ContainerType *a, std::vector<int> index) : m_container(a), m_index(index)
+        { }
+
+        auto operator[](int i)
         {
-            //std::cout << std::endl;
+            m_index.push_back(i);
+            return Proxy<ContainerType, SubDimension - 1>(m_container, m_index);
         }
+    };
 
-        template<typename Tv, typename... Args>
-        void fillIndex(Tv tv, Args&& ... args)
-        {
-            index.push_back(tv);
-            fillIndex(args...);
-        }
+    //конец рекурсии Proxy-класса
+    template<class ContainerType>
+    struct Proxy<ContainerType, 0>
+    {
+    private:
+        ContainerType *m_container;
+        std::vector<int> m_index;
+    public:
 
-        template <typename ... Args >
-        Proxy(ContainerType *a, Args&& ... args) : container(a)
+        Proxy(ContainerType *a, std::vector<int> index) : m_container(a), m_index(index)
+        { }
+
+        auto& operator = (const T& other)
         {
-            fillIndex(args...);
-            assert(this->index.size() == Dimension);
+
+            //do not store default values
+            if (other == DefVal)
+            {
+                m_container->m_data.erase(m_index);
+                return const_cast<T&>(other);
+            }
+
+            return m_container->m_data[m_index] = other;
         }
 
         operator T()
         {
-            if (container->m_data.find(index) != container->m_data.end())
-                return container->m_data[index];
+            if (m_container->m_data.find(m_index) != m_container->m_data.end())
+                return m_container->m_data[m_index];
             else
                 return DefVal;
         }
-
-        T& operator=(const T& other)
-        {
-            //do not store default values
-            if (other == DefVal)
-            {
-                container->m_data.erase(index);
-                return const_cast<T&>(other);
-            }
-
-            return container->m_data[index] = other;
-        }
     };
 
-    //operator[] does not support multi-arguments =(
-    //More info: https://stdcpp.ru/proposals/ebfbd6dc-7848-4864-8b5c-3c18cdc91b61
-    //workaround with operator()
-    template <typename ... Args >
-    auto operator()(Args&& ... args)
+    auto operator[](int i)
     {
-        //std::cout << "sizeof1 " << sizeof...(args) << std::endl;
-        return Proxy<Matrix<T, DefVal, Dimension> >(this, std::forward <Args>(args) ...);
+        std::vector<int> index;
+        index.push_back(i);
+        return Proxy<Matrix<T, DefVal, Dimension>, Dimension - 1 >(this, index);
     }
 
 private:
@@ -84,12 +88,12 @@ int main(int, char *[])
     Matrix<int, -1, 2> matrix2d;
     assert(matrix2d.size() == 0); // все ячейки свободны
 
-    auto a2d = matrix2d(2, 4);
+    auto a2d = matrix2d[2][4];
     assert(a2d == -1);
     assert(matrix2d.size() == 0);
 
-    matrix2d(100,100) = 314;
-    assert((matrix2d(100,100)) == 314);
+    matrix2d[100][100] = 314;
+    assert(matrix2d[100][100] == 314);
     assert(matrix2d.size() == 1);
 
     // выведется одна строка
@@ -106,12 +110,12 @@ int main(int, char *[])
     Matrix<int, -1, 3> matrix3d;
     assert(matrix3d.size() == 0); // все ячейки свободны
 
-    auto a3d = matrix3d(0,0,0);
+    auto a3d = matrix3d[0][0][0];
     assert(a3d == -1);
     assert(matrix3d.size() == 0);
 
-    matrix3d(100, 100, 100) = 314;
-    assert(matrix3d(100, 100, 100) == 314);
+    matrix3d[100][100][100] = 314;
+    assert(matrix3d[100][100][100] == 314);
     assert(matrix3d.size() == 1);
 
     // выведется одна строка
@@ -128,8 +132,8 @@ int main(int, char *[])
     Matrix<int, 0, 2> matrix;
     for(int i = 0, j = 0; i <= 9; ++i, ++j)
     {
-        matrix(i, i) = i;
-        matrix(9 - i, i) = 9 - i;
+        matrix[i][i] = i;
+        matrix[9 - i][i] = 9 - i;
     }
 
     //print matrix fragment
@@ -137,31 +141,31 @@ int main(int, char *[])
     {
         for(int j = 1; j <= 8; ++j)
         {
-            std::cout << matrix(i, j) << (j < 8 ? " " : "");
+            std::cout << matrix[i][j] << (j < 8 ? " " : "");
         }
         std::cout << std::endl;
     }
 
-    assert(matrix.size() == 18);
-    std::cout << matrix.size() << std::endl;
+        assert(matrix.size() == 18);
+        std::cout << matrix.size() << std::endl;
 
-    for(auto c : matrix)
-    {
-        for(auto v : c.first)
-            std::cout << v;
-        std::cout << c.second << std::endl;
-    }
+        for(auto c : matrix)
+        {
+            for(auto v : c.first)
+                std::cout << v;
+            std::cout << c.second << std::endl;
+        }
 
-    ((matrix(100, 100) = 314) = 0) = 217;
-    assert(matrix(100, 100) == 217);
-    assert(matrix.size() == 19);
-    //std::cout << matrix(100, 100) << std::endl; //print 217
+        ((matrix[100][100] = 314) = 0) = 217;
+        assert(matrix[100][100] == 217);
+        assert(matrix.size() == 19);
+        //std::cout << matrix(100, 100) << std::endl; //print 217
 
-    //check removing of element
-    matrix(100, 100) = 314;
-    assert(matrix.size() == 19);
-    matrix(100, 100) = 0;
-    assert(matrix.size() == 18);
+        //check removing of element
+        matrix[100][100] = 314;
+        assert(matrix.size() == 19);
+        matrix[100][100] = 0;
+        assert(matrix.size() == 18);
 
     return 0;
 }
